@@ -20,6 +20,14 @@ export class CthulhuDarkActorSheet extends ActorSheet {
     });
   }
 
+  // constructor(...args) {
+  //   super(...args);
+
+  //   this.actor.setFlag("cthulhudark", "miniMode", false);
+  // }
+
+
+
   /** @override */
   get template() {
     return `systems/cthulhudark/templates/actor/actor-${this.actor.type}-sheet.hbs`;
@@ -44,6 +52,9 @@ export class CthulhuDarkActorSheet extends ActorSheet {
     // Add roll data for TinyMCE editors.
     context.rollData = context.actor.getRollData();
 
+    // Add mini mode data
+    context.isMiniMode = this.actor.getFlag("cthulhudark", "miniMode") === true;
+
     return context;
   }
 
@@ -59,6 +70,37 @@ export class CthulhuDarkActorSheet extends ActorSheet {
 
     // Rollable.
     html.find(".rollable").click(this._onRoll.bind(this));
+
+    // Mini mode toggle.
+    html.find(".toggle-mini-mode").click(this._onToggleMiniMode.bind(this));
+
+    // Hack - resize the window to mini mode on first render if it's set.
+    if (this.actor.getFlag("cthulhudark", "miniMode") && !this._cdInitialRenderCompleted) {
+      this.setPosition({
+        width: 800,
+        height: 120,
+      });
+      console.log("============ test")
+    }
+
+    this._cdInitialRenderCompleted = true;
+  }
+
+  _onToggleMiniMode() {
+    const isMiniMode = !this.actor.getFlag("cthulhudark", "miniMode");
+    this.actor.setFlag("cthulhudark", "miniMode", isMiniMode);
+
+    if (isMiniMode) {
+      this.setPosition({
+        width: 800,
+        height: 120,
+      });
+    } else {
+      this.setPosition({
+        width: 310,
+        height: 820,
+      });
+    }
   }
 
   /**
@@ -297,127 +339,130 @@ export class CthulhuDarkActorSheet extends ActorSheet {
 
   async asyncCDMoveDialog({ move = 0 } = {}) {
     return await new Promise(async (resolve) => {
-      new Dialog({
-        title: this.dialogTitle(move),
-        content: await this.dialogContent(move),
-        buttons: {
-          button1: {
-            icon: '<i class="fa-solid fa-dice"></i>',
-            label: game.i18n.localize("CTHULHUDARK.Roll"),
-            callback: async (html) => {
-              // get and roll selected dice
-              const dice = [];
-              if (document.getElementById("humanDie").checked) {
-                let hdRoll = await new Roll("1d6").evaluate({ async: true });
-                dice.push({
-                  dieColor: CONFIG.CTHULHUDARK.BaseColor,
-                  isRisk: false,
-                  rollVal: hdRoll.result,
-                  roll: hdRoll,
-                });
-              }
-
-              if (document.getElementById("occupationalDie").checked) {
-                let odRoll = await new Roll("1d6").evaluate({ async: true });
-                dice.push({
-                  dieColor: CONFIG.CTHULHUDARK.BaseColor,
-                  isRisk: false,
-                  rollVal: odRoll.result,
-                  roll: odRoll,
-                });
-              }
-
-              if (document.getElementById("insightDie").checked) {
-                let idRoll = await new Roll("1d6").evaluate({ async: true });
-                dice.push({
-                  dieColor: CONFIG.CTHULHUDARK.RiskColor,
-                  isRisk: true,
-                  rollVal: idRoll.result,
-                  roll: idRoll,
-                });
-              }
-
-              const maxDie = dice.reduce((a, b) =>
-                a.rollVal > b.rollVal ? a : b
-              );
-
-              // Determine if the risk die won
-              let isRiskDie = false;
-              dice.every((die) => {
-                if (die.rollVal == maxDie.rollVal && die.isRisk) {
-                  isRiskDie = true;
-                  return false;
+      new Dialog(
+        {
+          title: this.dialogTitle(move),
+          content: await this.dialogContent(move),
+          buttons: {
+            button1: {
+              icon: '<i class="fa-solid fa-dice"></i>',
+              label: game.i18n.localize("CTHULHUDARK.Roll"),
+              callback: async (html) => {
+                // get and roll selected dice
+                const dice = [];
+                if (document.getElementById("humanDie").checked) {
+                  let hdRoll = await new Roll("1d6").evaluate({ async: true });
+                  dice.push({
+                    dieColor: CONFIG.CTHULHUDARK.BaseColor,
+                    isRisk: false,
+                    rollVal: hdRoll.result,
+                    roll: hdRoll,
+                  });
                 }
-                return true;
-              });
 
-              let riskMessage = "";
-              if (isRiskDie) {
-                riskMessage = this.getRiskMoveMessage();
-              }
+                if (document.getElementById("occupationalDie").checked) {
+                  let odRoll = await new Roll("1d6").evaluate({ async: true });
+                  dice.push({
+                    dieColor: CONFIG.CTHULHUDARK.BaseColor,
+                    isRisk: false,
+                    rollVal: odRoll.result,
+                    roll: odRoll,
+                  });
+                }
 
-              // Build Dice list
-              let diceOutput = "";
-              dice.forEach((die) => {
-                diceOutput = diceOutput.concat(
-                  this.getDiceForOutput(die.rollVal, die.dieColor),
-                  " "
+                if (document.getElementById("insightDie").checked) {
+                  let idRoll = await new Roll("1d6").evaluate({ async: true });
+                  dice.push({
+                    dieColor: CONFIG.CTHULHUDARK.RiskColor,
+                    isRisk: true,
+                    rollVal: idRoll.result,
+                    roll: idRoll,
+                  });
+                }
+
+                const maxDie = dice.reduce((a, b) =>
+                  a.rollVal > b.rollVal ? a : b
                 );
-              });
 
-              // Initialize chat data.
-              const chatContentMessage = this.chatContent(
-                move,
-                diceOutput,
-                maxDie.rollVal,
-                riskMessage
-              );
-              const user = game.user.id;
-              const speaker = ChatMessage.getSpeaker({ actor: this.actor });
-              const rollMode = game.settings.get("core", "rollMode");
-
-              ChatMessage.create({
-                user: user,
-                type: CONST.CHAT_MESSAGE_TYPES.ROLL,
-                rolls: dice.map((die) => {
-                  // If "Dice So Nice!" is installed, this configuration will trigger a visual
-                  // dice roll with appropriate standard and insight colored dice
-                  if (game.dice3d) {
-                    if (die.isRisk) {
-                      die.roll.dice[0].options.appearance = {
-                        colorset: "custom",
-                        foreground: "black",
-                        background: CONFIG.CTHULHUDARK.RiskColor,
-                      };
-                    } else {
-                      die.roll.dice[0].options.appearance = {
-                        colorset: "custom",
-                        foreground: "black",
-                        background: CONFIG.CTHULHUDARK.BaseColor,
-                      };
-                    }
+                // Determine if the risk die won
+                let isRiskDie = false;
+                dice.every((die) => {
+                  if (die.rollVal == maxDie.rollVal && die.isRisk) {
+                    isRiskDie = true;
+                    return false;
                   }
+                  return true;
+                });
 
-                  return die.roll;
-                }),
-                speaker: speaker,
-                rollMode: rollMode,
-                content: chatContentMessage,
-                flags: { cthulhudark: { chatID: "cthulhudark" }},
-              });
+                let riskMessage = "";
+                if (isRiskDie) {
+                  riskMessage = this.getRiskMoveMessage();
+                }
 
-              // ----
-              resolve(null);
+                // Build Dice list
+                let diceOutput = "";
+                dice.forEach((die) => {
+                  diceOutput = diceOutput.concat(
+                    this.getDiceForOutput(die.rollVal, die.dieColor),
+                    " "
+                  );
+                });
+
+                // Initialize chat data.
+                const chatContentMessage = this.chatContent(
+                  move,
+                  diceOutput,
+                  maxDie.rollVal,
+                  riskMessage
+                );
+                const user = game.user.id;
+                const speaker = ChatMessage.getSpeaker({ actor: this.actor });
+                const rollMode = game.settings.get("core", "rollMode");
+
+                ChatMessage.create({
+                  user: user,
+                  type: CONST.CHAT_MESSAGE_TYPES.ROLL,
+                  rolls: dice.map((die) => {
+                    // If "Dice So Nice!" is installed, this configuration will trigger a visual
+                    // dice roll with appropriate standard and insight colored dice
+                    if (game.dice3d) {
+                      if (die.isRisk) {
+                        die.roll.dice[0].options.appearance = {
+                          colorset: "custom",
+                          foreground: "black",
+                          background: CONFIG.CTHULHUDARK.RiskColor,
+                        };
+                      } else {
+                        die.roll.dice[0].options.appearance = {
+                          colorset: "custom",
+                          foreground: "black",
+                          background: CONFIG.CTHULHUDARK.BaseColor,
+                        };
+                      }
+                    }
+
+                    return die.roll;
+                  }),
+                  speaker: speaker,
+                  rollMode: rollMode,
+                  content: chatContentMessage,
+                  flags: { cthulhudark: { chatID: "cthulhudark" } },
+                });
+
+                // ----
+                resolve(null);
+              },
             },
           },
+          close: () => {
+            resolve(null);
+          },
         },
-        close: () => {
-          resolve(null);
-        },
-      }, {
-        // THIS ADDS A CLASS TO THE WINDOW
-        classes: ["cd-roll-dialog"],
-      }).render(true);
+        {
+          // THIS ADDS A CLASS TO THE WINDOW
+          classes: ["cd-roll-dialog"],
+        }
+      ).render(true);
     });
   }
 
@@ -501,7 +546,7 @@ export class CthulhuDarkActorSheet extends ActorSheet {
       colorset: "custom",
       foreground: "black",
       background: CONFIG.CTHULHUDARK.RiskColor,
-    }
+    };
 
     ChatMessage.create({
       user: user,
@@ -510,7 +555,7 @@ export class CthulhuDarkActorSheet extends ActorSheet {
       rolls: [insightRoll],
       rollMode: rollMode,
       content: chatContentMessage,
-      flags: { cthulhudark: { chatID: "cthulhudark" }}
+      flags: { cthulhudark: { chatID: "cthulhudark" } },
     });
   }
 
@@ -544,7 +589,7 @@ export class CthulhuDarkActorSheet extends ActorSheet {
       colorset: "custom",
       foreground: "black",
       background: CONFIG.CTHULHUDARK.BaseColor,
-    }
+    };
 
     ChatMessage.create({
       user: user,
@@ -553,7 +598,7 @@ export class CthulhuDarkActorSheet extends ActorSheet {
       rolls: [failureRoll],
       rollMode: rollMode,
       content: chatContentMessage,
-      flags: { cthulhudark: { chatID: "cthulhudark" }}
+      flags: { cthulhudark: { chatID: "cthulhudark" } },
     });
   }
 }

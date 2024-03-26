@@ -49,15 +49,61 @@
     }
   }
 
-  .rollable {
 
+  .rollable {
     &:hover, &:focus {
       text-shadow: 0 0 10px #99d097;
     }
   }
 
+  .mini-rollables-grid {
+    align-content: center;
+
+    .mini-rollable {
+      height: 36px;
+      width: 36px;
+    }
+  }
+
   .editor {
     height: 195px;
+  }
+
+  .mini-actor-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+
+    .profile-img.profile-img-mini {
+      height: 60px;
+      width: 60px;
+      margin-bottom: 0;
+    }
+
+    .mini-actor-header-title {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+
+      .actor-name {
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .actor-occupation {
+        font-size: 14px;
+        font-style: italic;
+      }
+
+      .actor-name, .actor-occupation {
+        width: 100%;
+        max-width: 200px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
   }
 }
 
@@ -90,6 +136,7 @@
 }
 
 .cd-sheet-header {
+  position: relative;
   flex: 0 auto;
   overflow: hidden;
   display: flex;
@@ -97,7 +144,26 @@
   flex-wrap: wrap;
   justify-content: flex-start;
   padding: 8px 8px 0px 8px;
-  
+
+  .toggle-mini-mode {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 30px;
+    height: 30px;
+    opacity: 0;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  &.mini-mode {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 20px;
+  }
+
   button {
     color: white;
     background-color: #423543;
